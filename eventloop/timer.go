@@ -20,7 +20,7 @@ func (timerTask *TimerTask) check(currentTime int64) int {
 	return 0
 }
 
-func NewTimerTask(interval int, callback func(int)) *TimerTask {
+func MakeTimerTask(interval int, callback func(int)) *TimerTask {
 	timerTask := &TimerTask{interval, callback, time.Now().UnixMilli()}
 	timerModule.addTask(timerTask)
 	return timerTask
@@ -39,7 +39,7 @@ func (timerResult *TimerTaskResult) process() {
 	timerResult.timerTask.callback(timerResult.dt)
 }
 
-func MakeTimerResult(timerTask *TimerTask, dt int) *TimerTaskResult {
+func makeTimerResult(timerTask *TimerTask, dt int) *TimerTaskResult {
 	return &TimerTaskResult{timerTask, dt}
 }
 
@@ -80,7 +80,7 @@ func (timerModule *TimerModule) updateTimerTask(timerTask *TimerTask) {
 	currentTime := time.Now().UnixMilli()
 	dt := timerTask.check(currentTime)
 	if dt > 0 {
-		timerResult := MakeTimerResult(timerTask, dt)
+		timerResult := makeTimerResult(timerTask, dt)
 		timerModule.events <- timerResult
 	}
 }

@@ -13,7 +13,7 @@ func (app *App) exec() {
 var app *App
 
 func NewApp() {
-	events := make(chan IResult, 10000)
+	events := make(chan IResult, 1<<16)
 	initModules(events)
 	app = &App{events}
 }
@@ -24,5 +24,5 @@ func RunApp() {
 
 func initModules(events chan IResult) {
 	initTimerModule(events)
-	initApi()
+	initAPICallModule(events)
 }
