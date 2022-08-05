@@ -67,7 +67,7 @@ func (timerModule *TimerModule) removeTask(timerTask *TimerTask) {
 func (timerModule *TimerModule) exec() {
 	for {
 		timerModule.timerLock.Lock()
-		for timerTask, _ := range timerModule.timers {
+		for timerTask := range timerModule.timers {
 			timerModule.updateTimerTask(timerTask)
 		}
 		timerModule.timerLock.Unlock()
