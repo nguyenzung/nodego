@@ -1,7 +1,6 @@
 package eventloop
 
 import (
-	"fmt"
 	"time"
 )
 
@@ -23,7 +22,6 @@ func (timerTask *TimerTask) check(currentTime int64) int {
 func NewTimerTask(interval int, callback func(int)) *TimerTask {
 	timerTask := &TimerTask{interval, callback, time.Now().UnixMilli()}
 	timerManager.addTask(timerTask)
-	fmt.Println(timerManager.timers)
 	return timerTask
 }
 
@@ -37,7 +35,7 @@ type TimerTaskResult struct {
 }
 
 func (timerResult *TimerTaskResult) process() {
-	fmt.Println(" process in timer ")
+
 	timerResult.timerTask.callback(timerResult.dt)
 }
 
