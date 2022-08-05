@@ -1,29 +1,28 @@
 package eventloop
 
-import (
-	"fmt"
-	"time"
-)
-
 type App struct {
+	events chan IResult
 }
 
 func (app *App) exec() {
-	for {
-		fmt.Println("event loop is running")
-		time.Sleep(time.Millisecond)
+	for event := range app.events {
+		event.process()
 	}
 }
 
 var app *App
 
-func InitAndRunApp() {
-	initModules()
-	app = &App{}
+func NewApp() {
+	events := make(chan IResult, 10000)
+	initModules(events)
+	app = &App{events}
+}
+
+func RunApp() {
 	app.exec()
 }
 
-func initModules() {
-	initTimerManager()
+func initModules(events chan IResult) {
+	initTimerManager(events)
 	initApi()
 }
