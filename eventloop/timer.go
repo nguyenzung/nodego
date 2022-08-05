@@ -1,6 +1,7 @@
 package eventloop
 
 import (
+	"sync"
 	"time"
 )
 
@@ -21,12 +22,12 @@ func (timerTask *TimerTask) check(currentTime int64) int {
 
 func NewTimerTask(interval int, callback func(int)) *TimerTask {
 	timerTask := &TimerTask{interval, callback, time.Now().UnixMilli()}
-	timerManager.addTask(timerTask)
+	timerModule.addTask(timerTask)
 	return timerTask
 }
 
 func RemoveTimerTask(timerTask *TimerTask) {
-	timerManager.removeTask(timerTask)
+	timerModule.removeTask(timerTask)
 }
 
 type TimerTaskResult struct {
@@ -35,7 +36,6 @@ type TimerTaskResult struct {
 }
 
 func (timerResult *TimerTaskResult) process() {
-
 	timerResult.timerTask.callback(timerResult.dt)
 }
 
@@ -43,44 +43,51 @@ func MakeTimerResult(timerTask *TimerTask, dt int) *TimerTaskResult {
 	return &TimerTaskResult{timerTask, dt}
 }
 
-type TimerManager struct {
-	timers map[*TimerTask]struct{}
-	events chan IResult
+type TimerModule struct {
+	timerLock sync.Mutex
+	timers    map[*TimerTask]struct{}
+	events    chan IResult
 }
 
-func (timerManager *TimerManager) addTask(timerTask *TimerTask) {
-	timerManager.timers[timerTask] = struct{}{}
+func (timerModule *TimerModule) addTask(timerTask *TimerTask) {
+	timerModule.timerLock.Lock()
+	timerModule.timers[timerTask] = struct{}{}
+	timerModule.timerLock.Unlock()
 }
 
-func (timerManager *TimerManager) removeTask(timerTask *TimerTask) {
-	_, ok := timerManager.timers[timerTask]
+func (timerModule *TimerModule) removeTask(timerTask *TimerTask) {
+	timerModule.timerLock.Lock()
+	_, ok := timerModule.timers[timerTask]
 	if ok {
-		delete(timerManager.timers, timerTask)
+		delete(timerModule.timers, timerTask)
 	}
+	timerModule.timerLock.Unlock()
 }
 
-func (timerManager *TimerManager) exec() {
+func (timerModule *TimerModule) exec() {
 	for {
-		for timerTask, _ := range timerManager.timers {
-			timerManager.updateTimerTask(timerTask)
+		timerModule.timerLock.Lock()
+		for timerTask, _ := range timerModule.timers {
+			timerModule.updateTimerTask(timerTask)
 		}
+		timerModule.timerLock.Unlock()
 		time.Sleep(time.Millisecond)
 	}
 }
 
-func (timerManager *TimerManager) updateTimerTask(timerTask *TimerTask) {
+func (timerModule *TimerModule) updateTimerTask(timerTask *TimerTask) {
 	// fmt.Println("Update Timer", timerTask.interval)
 	currentTime := time.Now().UnixMilli()
 	dt := timerTask.check(currentTime)
 	if dt > 0 {
 		timerResult := MakeTimerResult(timerTask, dt)
-		timerManager.events <- timerResult
+		timerModule.events <- timerResult
 	}
 }
 
-var timerManager *TimerManager
+var timerModule *TimerModule
 
-func initTimerManager(events chan IResult) {
-	timerManager = &TimerManager{make(map[*TimerTask]struct{}), events}
-	go timerManager.exec()
+func initTimerModule(events chan IResult) {
+	timerModule = &TimerModule{timers: make(map[*TimerTask]struct{}), events: events}
+	go timerModule.exec()
 }

@@ -23,6 +23,6 @@ func RunApp() {
 }
 
 func initModules(events chan IResult) {
-	initTimerManager(events)
+	initTimerModule(events)
 	initApi()
 }
