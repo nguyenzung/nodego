@@ -26,11 +26,11 @@ func timeout3(interval int) {
 }
 
 func apihandle(res string) {
-	fmt.Println("Response: ", res)
+	fmt.Println("Response: ", res, " ThreadID", threadutils.TheadID())
 }
 
 func exception(err error) {
-	fmt.Println("API Call err", err)
+	fmt.Println("API Call err", err, " ThreadID", threadutils.TheadID())
 }
 
 func main() {
