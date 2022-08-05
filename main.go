@@ -43,5 +43,9 @@ func main() {
 	ev.MakeCallTask("http://localhost:8081", 5, apihandle, exception)
 	ev.MakeCallTask("http://localhost:8082", 11, apihandle, exception)
 	ev.MakeCallTask("http://localhost:8083", 11, apihandle, exception)
+	ev.MakeCallTask("http://localhost:8084", 11, apihandle, exception)
+	ev.MakeCallTask("http://localhost:8085", 11, apihandle, exception)
+	ev.MakeCallTask("http://localhost:8086", 10, apihandle, exception)
+	ev.MakeCallTask("http://localhost:8087", 9, apihandle, exception)
 	ev.RunApp()
 }

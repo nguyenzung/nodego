@@ -14,12 +14,12 @@ func (taskThread *APIProcessThread) exec() {
 	for {
 		callTask := <-taskThread.callModule.tasks
 		resp, err := callTask.send()
-		callResult := NewAPICallTaskResult(callTask, resp, err)
+		callResult := newAPICallTaskResult(callTask, resp, err)
 		taskThread.callModule.pushCallResult(callResult)
 	}
 }
 
-func NewAPIProcessThread(callModule *APICallModule) *APIProcessThread {
+func newAPIProcessThread(callModule *APICallModule) *APIProcessThread {
 	return &APIProcessThread{callModule}
 }
 
@@ -66,7 +66,7 @@ func (callResult *APICallTaskResult) process() {
 	}
 }
 
-func NewAPICallTaskResult(callTask *APICallTask, resp string, err error) *APICallTaskResult {
+func newAPICallTaskResult(callTask *APICallTask, resp string, err error) *APICallTaskResult {
 	return &APICallTaskResult{callTask, resp, err}
 }
 
@@ -82,7 +82,7 @@ func (api *APICallModule) pushCallResult(callResult *APICallTaskResult) {
 
 func (api *APICallModule) makeWorkerThread() {
 	for i := 0; i < api.numThread; i++ {
-		go NewAPIProcessThread(api).exec()
+		go newAPIProcessThread(api).exec()
 	}
 }
 
