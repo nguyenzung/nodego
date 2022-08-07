@@ -25,4 +25,5 @@ func RunApp() {
 func initModules(events chan IResult) {
 	initTimerModule(events)
 	initAPICallModule(events)
+	initHTTPServerModule(events)
 }
