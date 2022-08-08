@@ -71,9 +71,9 @@ func newAPICallTaskResult(callTask *APICallTask, resp string, err error) *APICal
 }
 
 type APICallModule struct {
-	events    chan IResult
-	numThread int
+	events    chan IEvent
 	tasks     chan *APICallTask
+	numThread int
 }
 
 func (api *APICallModule) pushCallResult(callResult *APICallTaskResult) {
@@ -92,7 +92,10 @@ func (api *APICallModule) exec() {
 
 var api *APICallModule
 
-func initAPICallModule(events chan IResult) {
+func initAPICallModule(events chan IEvent) {
 	api = &APICallModule{events: events, numThread: API_NUM_THREAD, tasks: make(chan *APICallTask, API_NUM_THREAD)}
+}
+
+func startAPICallModule() {
 	go api.exec()
 }

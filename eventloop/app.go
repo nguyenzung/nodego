@@ -1,7 +1,7 @@
 package eventloop
 
 type App struct {
-	events chan IResult
+	events chan IEvent
 }
 
 func (app *App) exec() {
@@ -13,17 +13,24 @@ func (app *App) exec() {
 var app *App
 
 func NewApp() {
-	events := make(chan IResult, 1<<16)
+	events := make(chan IEvent, 1<<16)
 	initModules(events)
 	app = &App{events}
 }
 
 func RunApp() {
+	startModules()
 	app.exec()
 }
 
-func initModules(events chan IResult) {
+func initModules(events chan IEvent) {
 	initTimerModule(events)
 	initAPICallModule(events)
 	initHTTPServerModule(events)
+}
+
+func startModules() {
+	startTimerModule()
+	startAPICallModule()
+	startHTTPServerModule()
 }
