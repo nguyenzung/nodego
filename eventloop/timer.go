@@ -76,13 +76,18 @@ func (timerModule *TimerModule) exec() {
 }
 
 func (timerModule *TimerModule) updateTimerTask(timerTask *TimerTask) {
-	// fmt.Println("Update Timer", timerTask.interval)
 	currentTime := time.Now().UnixMilli()
 	dt := timerTask.check(currentTime)
 	if dt > 0 {
 		timerResult := makeTimerResult(timerTask, dt)
 		timerModule.events <- timerResult
 	}
+}
+
+func GetTimerLength() int {
+	timerModule.timerLock.Lock()
+	defer timerModule.timerLock.Unlock()
+	return len(timerModule.timers)
 }
 
 var timerModule *TimerModule
