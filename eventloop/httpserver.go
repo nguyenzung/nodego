@@ -4,54 +4,68 @@ import (
 	"fmt"
 	"log"
 	"net/http"
-
-	"github.com/go-event-loop/threadutils"
+	"sync"
 )
 
+type HTTPResponse struct {
+	http.ResponseWriter
+	locker *sync.Mutex
+}
+
+func (response HTTPResponse) start() {
+	response.locker.Lock()
+}
+
+func (response HTTPResponse) Finish() {
+	response.locker.Unlock()
+	// response.flagChannel <- struct{}{}
+}
+
+func (response HTTPResponse) wait() {
+	response.locker.Lock()
+	response.locker.Unlock()
+}
+
 type HTTPServeEvent struct {
-	w       http.ResponseWriter
+	w       HTTPResponse
 	r       *http.Request
-	s       chan struct{}
-	handler func(http.ResponseWriter, *http.Request, chan struct{})
+	handler func(HTTPResponse, *http.Request)
 }
 
 func (event *HTTPServeEvent) process() {
-	fmt.Println("Process a request ", threadutils.ThreadID())
 	w := event.w
 	r := event.r
-	s := event.s
-	event.handler(w, r, s)
+	event.handler(w, r)
 }
 
 type HTTPServerModule struct {
 	events    chan IEvent
-	apiMapper map[string]func(http.ResponseWriter, *http.Request, chan struct{})
+	locker    *sync.Mutex
+	apiMapper map[string]func(HTTPResponse, *http.Request)
 }
 
 func (httpModule *HTTPServerModule) exec() {
-	log.Fatal(http.ListenAndServe("0.0.0.0:8080", nil))
+	log.Fatal(http.ListenAndServe(fmt.Sprintf("%s:%d", HTTP_IP, HTTP_PORT), nil))
 }
 
 var httpModule *HTTPServerModule
 
-func MakeAPIHandler(path string, handler func(http.ResponseWriter, *http.Request, chan struct{})) {
+func MakeAPIHandler(path string, handler func(HTTPResponse, *http.Request)) {
 	httpModule.apiMapper[path] = handler
-	http.HandleFunc(path, func(w http.ResponseWriter, r *http.Request) {
-		fmt.Println("A request comes ", httpModule.apiMapper)
+	http.HandleFunc(path, func(rw http.ResponseWriter, r *http.Request) {
 		handler, status := httpModule.apiMapper[path]
-		fmt.Println("Check", &handler, status)
 		if status {
-			fmt.Println("Found handler")
-			flag := make(chan struct{})
-			serveEvent := HTTPServeEvent{w, r, flag, handler}
+			w := HTTPResponse{rw, httpModule.locker}
+			w.start()
+			serveEvent := HTTPServeEvent{w, r, handler}
 			httpModule.events <- &serveEvent
-			fmt.Println("Finish a request:", <-flag)
+			w.wait()
 		}
 	})
 }
 
 func initHTTPServerModule(events chan IEvent) {
-	httpModule = &HTTPServerModule{events, make(map[string]func(http.ResponseWriter, *http.Request, chan struct{}))}
+	httpModule = &HTTPServerModule{events, &sync.Mutex{}, make(map[string]func(HTTPResponse, *http.Request))}
 }
 
 func startHTTPServerModule() {

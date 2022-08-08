@@ -1,6 +1,7 @@
 package eventloop
 
 import (
+	"fmt"
 	"io/ioutil"
 	"net/http"
 	"time"
@@ -14,6 +15,7 @@ func (taskThread *APIProcessThread) exec() {
 	for {
 		callTask := <-taskThread.callModule.tasks
 		resp, err := callTask.send()
+		fmt.Println("Start request", time.Now())
 		callResult := newAPICallTaskResult(callTask, resp, err)
 		taskThread.callModule.pushCallResult(callResult)
 	}
