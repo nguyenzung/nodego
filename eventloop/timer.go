@@ -46,7 +46,7 @@ func makeTimerResult(timerTask *TimerTask, dt int) *TimerTaskResult {
 type TimerModule struct {
 	timerLock sync.Mutex
 	timers    map[*TimerTask]struct{}
-	events    chan IEvent
+	BaseModule
 }
 
 func (timerModule *TimerModule) addTask(timerTask *TimerTask) {
@@ -93,7 +93,7 @@ func GetTimerLength() int {
 var timerModule *TimerModule
 
 func initTimerModule(events chan IEvent) {
-	timerModule = &TimerModule{timers: make(map[*TimerTask]struct{}), events: events}
+	timerModule = &TimerModule{timers: make(map[*TimerTask]struct{}), BaseModule: BaseModule{events}}
 }
 
 func startTimerModule() {

@@ -25,10 +25,22 @@ func main() {
 	})
 
 	ev.MakeAPIHandler("/counter", func(w ev.HTTPResponse, r *http.Request) {
-		w.Write([]byte(" Counter "))
-		w.Write([]byte(fmt.Sprintln(time.Now())))
-		w.Write([]byte(" ! ThreadID: "))
-		w.Write([]byte(fmt.Sprintln(threadutils.ThreadID())))
+		switch r.Method {
+		case "GET":
+			{
+				w.Write([]byte(" Counter GET "))
+				w.Write([]byte(fmt.Sprintln(time.Now())))
+				w.Write([]byte(" ! ThreadID: "))
+				w.Write([]byte(fmt.Sprintln(threadutils.ThreadID())))
+			}
+		case "POST":
+			{
+				w.Write([]byte(" Counter POST "))
+				w.Write([]byte(fmt.Sprintln(time.Now())))
+				w.Write([]byte(" ! ThreadID: "))
+				w.Write([]byte(fmt.Sprintln(threadutils.ThreadID())))
+			}
+		}
 		w.Finish()
 	})
 	ev.RunApp()

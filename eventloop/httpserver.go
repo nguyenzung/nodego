@@ -9,21 +9,16 @@ import (
 
 type HTTPResponse struct {
 	http.ResponseWriter
-	locker *sync.Mutex
-}
-
-func (response HTTPResponse) start() {
-	response.locker.Lock()
+	flagChannel chan struct{}
 }
 
 func (response HTTPResponse) Finish() {
-	response.locker.Unlock()
-	// response.flagChannel <- struct{}{}
+	response.flagChannel <- struct{}{}
 }
 
 func (response HTTPResponse) wait() {
-	response.locker.Lock()
-	response.locker.Unlock()
+	<-response.flagChannel
+
 }
 
 type HTTPServeEvent struct {
@@ -39,7 +34,7 @@ func (event *HTTPServeEvent) process() {
 }
 
 type HTTPServerModule struct {
-	events    chan IEvent
+	BaseModule
 	locker    *sync.Mutex
 	apiMapper map[string]func(HTTPResponse, *http.Request)
 }
@@ -55,8 +50,8 @@ func MakeAPIHandler(path string, handler func(HTTPResponse, *http.Request)) {
 	http.HandleFunc(path, func(rw http.ResponseWriter, r *http.Request) {
 		handler, status := httpModule.apiMapper[path]
 		if status {
-			w := HTTPResponse{rw, httpModule.locker}
-			w.start()
+			flagChannel := make(chan struct{})
+			w := HTTPResponse{rw, flagChannel}
 			serveEvent := HTTPServeEvent{w, r, handler}
 			httpModule.events <- &serveEvent
 			w.wait()
@@ -65,7 +60,7 @@ func MakeAPIHandler(path string, handler func(HTTPResponse, *http.Request)) {
 }
 
 func initHTTPServerModule(events chan IEvent) {
-	httpModule = &HTTPServerModule{events, &sync.Mutex{}, make(map[string]func(HTTPResponse, *http.Request))}
+	httpModule = &HTTPServerModule{BaseModule{events}, &sync.Mutex{}, make(map[string]func(HTTPResponse, *http.Request))}
 }
 
 func startHTTPServerModule() {
