@@ -26,6 +26,17 @@ func MakeTimerTask(interval int, callback func(int)) *TimerTask {
 	return timerTask
 }
 
+func MakeOneTimeTask(delay int, callback func(int)) *TimerTask {
+	var timerTask *TimerTask
+	wrapper := func(delay int) {
+		callback(delay)
+		timerModule.removeTask(timerTask)
+	}
+	timerTask = &TimerTask{delay, wrapper, time.Now().UnixMilli()}
+	timerModule.addTask(timerTask)
+	return timerTask
+}
+
 func RemoveTimerTask(timerTask *TimerTask) {
 	timerModule.removeTask(timerTask)
 }
