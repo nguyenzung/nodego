@@ -5,13 +5,17 @@ import (
 	"net/http"
 	"time"
 
-	ev "github.com/go-event-loop/eventloop"
-	"github.com/go-event-loop/threadutils"
+	ev "github.com/nguyenzung/go-event-loop/eventloop"
+	"github.com/nguyenzung/go-event-loop/threadutils"
 )
 
 func main() {
+
 	ev.NewApp()
 	fmt.Println(" MainThread ID: ", threadutils.ThreadID())
+
+	ev.MakeOneTimeTask(5000, func(delay int) { fmt.Println("One time task callback", delay) })
+
 	ev.MakeAPIHandler("/test", func(w ev.HTTPResponse, r *http.Request) {
 		w.Write([]byte(" Test "))
 		w.Write([]byte(fmt.Sprintln(time.Now())))

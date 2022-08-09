@@ -27,10 +27,12 @@ func initModules(events chan IEvent) {
 	initTimerModule(events)
 	initAPICallModule(events)
 	initHTTPServerModule(events)
+	initWebsocketModule(events)
 }
 
 func startModules() {
 	startTimerModule()
 	startAPICallModule()
 	startHTTPServerModule()
+	startWebsocketModule()
 }
