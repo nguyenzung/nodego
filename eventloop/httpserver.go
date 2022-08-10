@@ -7,24 +7,31 @@ import (
 	"sync"
 )
 
-type HTTPResponse struct {
+type HTTPResponseWriter struct {
 	http.ResponseWriter
 	flagChannel chan struct{}
 }
 
-func (response HTTPResponse) Finish() {
+func (response *HTTPResponseWriter) Send(data string) {
+	response.ResponseWriter.Write([]byte(data))
+	response.ResponseWriter = nil
 	response.flagChannel <- struct{}{}
 }
 
-func (response HTTPResponse) wait() {
-	<-response.flagChannel
+func (response *HTTPResponseWriter) Write(data []byte) {
+	response.ResponseWriter.Write(data)
+	response.ResponseWriter = nil
+	response.flagChannel <- struct{}{}
+}
 
+func (response *HTTPResponseWriter) wait() {
+	<-response.flagChannel
 }
 
 type HTTPServeEvent struct {
-	w       HTTPResponse
+	w       *HTTPResponseWriter
 	r       *http.Request
-	handler func(HTTPResponse, *http.Request)
+	handler func(*HTTPResponseWriter, *http.Request)
 }
 
 func (event *HTTPServeEvent) process() {
@@ -35,23 +42,24 @@ func (event *HTTPServeEvent) process() {
 
 type HTTPServerModule struct {
 	BaseModule
+	server    *http.Server
 	locker    *sync.Mutex
-	apiMapper map[string]func(HTTPResponse, *http.Request)
+	apiMapper map[string]func(*HTTPResponseWriter, *http.Request)
 }
 
 func (httpModule *HTTPServerModule) exec() {
-	log.Fatal(http.ListenAndServe(fmt.Sprintf("%s:%d", HTTP_IP, HTTP_PORT), nil))
+	log.Fatal("[LOG]", httpModule.server.ListenAndServe())
 }
 
 var httpModule *HTTPServerModule
 
-func MakeAPIHandler(path string, handler func(HTTPResponse, *http.Request)) {
+func MakeAPIHandler(path string, handler func(*HTTPResponseWriter, *http.Request)) {
 	httpModule.apiMapper[path] = handler
-	http.HandleFunc(path, func(rw http.ResponseWriter, r *http.Request) {
+	httpModule.server.Handler.(*http.ServeMux).HandleFunc(path, func(rw http.ResponseWriter, r *http.Request) {
 		handler, status := httpModule.apiMapper[path]
 		if status {
 			flagChannel := make(chan struct{})
-			w := HTTPResponse{rw, flagChannel}
+			w := &HTTPResponseWriter{rw, flagChannel}
 			serveEvent := HTTPServeEvent{w, r, handler}
 			httpModule.events <- &serveEvent
 			w.wait()
@@ -60,7 +68,8 @@ func MakeAPIHandler(path string, handler func(HTTPResponse, *http.Request)) {
 }
 
 func initHTTPServerModule(events chan IEvent) {
-	httpModule = &HTTPServerModule{BaseModule{events}, &sync.Mutex{}, make(map[string]func(HTTPResponse, *http.Request))}
+	server := makeServer(fmt.Sprintf("%s:%d", HTTP_IP, HTTP_PORT))
+	httpModule = &HTTPServerModule{BaseModule{events}, server, &sync.Mutex{}, make(map[string]func(*HTTPResponseWriter, *http.Request))}
 }
 
 func startHTTPServerModule() {
