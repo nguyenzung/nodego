@@ -1,6 +1,8 @@
 package eventloop
 
-import "net/http"
+import (
+	"net/http"
+)
 
 type App struct {
 	api    *APICallModule
@@ -34,6 +36,10 @@ func (app *App) RemoveTimerTask(timerTask *TimerTask) {
 
 func (app *App) MakeAPIHandler(path string, handler func(*HTTPResponseWriter, *http.Request)) {
 	app.http.makeAPIHandler(path, handler)
+}
+
+func (app *App) MakeWSHandler(path string, messageHandler func(*MessageEvent, *Session), closeHandler func(*CloseEvent, *Session) error) {
+	app.ws.makeWSHandler(path, messageHandler, closeHandler)
 }
 
 func (app *App) initModules(events chan IEvent) {

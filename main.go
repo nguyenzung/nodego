@@ -5,23 +5,12 @@ import (
 	"net/http"
 
 	ev "github.com/nguyenzung/go-event-loop/eventloop"
+	"github.com/nguyenzung/go-event-loop/threadutils"
 )
 
 func main() {
 
 	app := ev.NewApp()
-	// app.MakeTimerTask(2000, func(delay int) { fmt.Println(" Timer task callback", delay) })
-	// app.MakeOneTimeTask(5000, func(delay int) { fmt.Println("One time task callback", delay) })
-	app.MakeCallTask("http://localhost:8080", 10, func(s string) {
-		fmt.Println("Got data:", s)
-	}, func(e error) {
-		fmt.Println("[CALL ERROR]", e)
-	})
-	app.MakeCallTask("http://localhost:8080", 11, func(s string) {
-		fmt.Println("Got data:", s)
-	}, func(e error) {
-		fmt.Println("[CALL ERROR]", e)
-	})
 
 	app.MakeAPIHandler("/test", func(w *ev.HTTPResponseWriter, r *http.Request) {
 		app.MakeOneTimeTask(10000, func(i int) {
@@ -40,6 +29,15 @@ func main() {
 				w.Write([]byte("POST method in /counter"))
 			}
 		}
+	})
+
+	app.MakeWSHandler("/", func(message *ev.MessageEvent, session *ev.Session) {
+		fmt.Println("[Message]", string(message.Data), " ||| ThreadID:", threadutils.ThreadID())
+		session.WriteText([]byte("Hello from mainthread in server"))
+	}, func(closeMessage *ev.CloseEvent, session *ev.Session) error {
+		fmt.Println("[WS Connection is closed]", closeMessage.Code, closeMessage.Text)
+		session.Close(1000, "Bye")
+		return nil
 	})
 
 	app.RunApp()

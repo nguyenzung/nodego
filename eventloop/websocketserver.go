@@ -14,26 +14,57 @@ var upgrader = websocket.Upgrader{
 }
 
 type Session struct {
-	path             string
-	conn             *websocket.Conn
-	messageHandler   func(message MessageEvent, session *Session)
-	closeHandler     func(code int, text string) error
-	replyChannel     chan *ReplyMessage
-	onMessageChannel chan *MessageEvent
+	path           string
+	conn           *websocket.Conn
+	wsModule       *WebsocketModule
+	messageHandler func(message *MessageEvent, session *Session)
+	closeHandler   func(closeMessage *CloseEvent, session *Session) error
+	replyChannel   chan *ReplyMessage
 }
 
-func makeSession(path string, conn *websocket.Conn, messageHandler func(MessageEvent, *Session), closeHandler func(code int, text string) error) *Session {
-	return &Session{path: path, conn: conn, messageHandler: messageHandler, closeHandler: closeHandler, replyChannel: make(chan *ReplyMessage), onMessageChannel: make(chan *MessageEvent)}
+func (session *Session) init() {
+	session.conn.SetCloseHandler(func(code int, text string) error {
+		closeMessage := makeCloseEvent(session, code, text)
+		session.wsModule.events <- closeMessage
+		return nil
+	})
+}
+
+func makeSession(path string, conn *websocket.Conn, wsModule *WebsocketModule, messageHandler func(*MessageEvent, *Session), closeHandler func(*CloseEvent, *Session) error) *Session {
+	return &Session{path: path, conn: conn, wsModule: wsModule, messageHandler: messageHandler, closeHandler: closeHandler, replyChannel: make(chan *ReplyMessage)}
 }
 
 type MessageEvent struct {
-	messageType int
-	data        []byte
-	err         error
+	session     *Session
+	MessageType int
+	Data        []byte
+	Err         error
 }
 
-func MakeMessageEvent(messageType int, data []byte, err error) *MessageEvent {
-	return &MessageEvent{messageType, data, err}
+func (messageEvent *MessageEvent) process() {
+	if messageEvent.session != nil && messageEvent.session.messageHandler != nil {
+		messageEvent.session.messageHandler(messageEvent, messageEvent.session)
+	}
+}
+
+func makeMessageEvent(session *Session, messageType int, data []byte, err error) *MessageEvent {
+	return &MessageEvent{session, messageType, data, err}
+}
+
+type CloseEvent struct {
+	session *Session
+	Code    int
+	Text    string
+}
+
+func (closeEvent *CloseEvent) process() {
+	if closeEvent.session != nil && closeEvent.session.closeHandler != nil {
+		closeEvent.session.closeHandler(closeEvent, closeEvent.session)
+	}
+}
+
+func makeCloseEvent(session *Session, code int, text string) *CloseEvent {
+	return &CloseEvent{session, code, text}
 }
 
 type ReplyMessage struct {
@@ -45,23 +76,33 @@ func MakeReplyMessage(messageType int, data []byte) *ReplyMessage {
 	return &ReplyMessage{messageType, data}
 }
 
+type IOErrorEvent struct {
+}
+
 func (session *Session) listen() {
 	for {
 		messageType, p, err := session.conn.ReadMessage()
+		message := makeMessageEvent(session, messageType, p, err)
+		if messageType == websocket.TextMessage || messageType == websocket.BinaryMessage {
+			session.wsModule.events <- message
+		}
 		if err != nil {
-			log.Println(err)
-		} else {
-			fmt.Println("[Message]", "%d %s", messageType, string(p))
-			message := MakeMessageEvent(messageType, p, err)
-			session.onMessageChannel <- message
+			fmt.Println("[WS] Receive data from client failed", err)
+			break
 		}
 	}
+	fmt.Println("End ws read thread")
 }
 
 func (session *Session) response() {
 	for replyMessage := range session.replyChannel {
-		session.conn.WriteMessage(replyMessage.messageType, replyMessage.data)
+		err := session.conn.WriteMessage(replyMessage.messageType, replyMessage.data)
+		if err != nil {
+			fmt.Println("[WS] Send data to client failed", err)
+			break
+		}
 	}
+	fmt.Println("End ws write thread")
 }
 
 func (session *Session) WriteText(data []byte) {
@@ -74,10 +115,11 @@ func (session *Session) WriteBytes(data []byte) {
 	session.replyChannel <- replyMessage
 }
 
-func (session *Session) Close(code int, data []byte) {
-	replyMessage := MakeReplyMessage(websocket.BinaryMessage, data)
+func (session *Session) Close(code int, data string) {
+	replyMessage := MakeReplyMessage(websocket.CloseMessage, websocket.FormatCloseMessage(code, data))
 	session.replyChannel <- replyMessage
 	close(session.replyChannel)
+
 }
 
 type WebsocketModule struct {
@@ -86,20 +128,20 @@ type WebsocketModule struct {
 	sessions map[*Session]struct{}
 }
 
-func (websocket *WebsocketModule) MakeWS(path string, messageHandler func(message MessageEvent, session *Session), closeHandler func(code int, text string) error) {
+func (websocket *WebsocketModule) makeWSHandler(path string, messageHandler func(*MessageEvent, *Session), closeHandler func(*CloseEvent, *Session) error) {
 	websocket.server.Handler.(*http.ServeMux).HandleFunc(path, func(w http.ResponseWriter, r *http.Request) {
 		fmt.Println("Request come")
 		upgrader.CheckOrigin = func(r *http.Request) bool { return true }
 		conn, err := upgrader.Upgrade(w, r, nil)
-
+		// conn.SetReadDeadline(time.Time{}.Add(time.Second))
 		if err != nil {
 			log.Println(err)
 		} else {
-			session := makeSession(path, conn, messageHandler, closeHandler)
+			session := makeSession(path, conn, websocket, messageHandler, closeHandler)
+			session.init()
 			go session.listen()
 			go session.response()
 		}
-
 		log.Println("Client Connected")
 	})
 }

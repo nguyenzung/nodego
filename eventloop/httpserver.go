@@ -53,6 +53,7 @@ func (httpModule *HTTPServerModule) makeAPIHandler(path string, handler func(*HT
 		serveEvent := HTTPServeEvent{w, r, handler}
 		httpModule.events <- &serveEvent
 		w.wait()
+		close(flagChannel)
 	})
 }
 
