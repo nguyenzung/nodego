@@ -29,7 +29,7 @@ func (app *App) MakeOneTimeTask(delay int, callback func(int)) *TimerTask {
 }
 
 func (app *App) RemoveTimerTask(timerTask *TimerTask) {
-	app.timer.removeTask(timerTask)
+	app.timer.removeTimerTask(timerTask)
 }
 
 func (app *App) MakeAPIHandler(path string, handler func(*HTTPResponseWriter, *http.Request)) {
