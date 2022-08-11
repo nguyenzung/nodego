@@ -20,27 +20,6 @@ func (timerTask *TimerTask) check(currentTime int64) int {
 	return 0
 }
 
-func MakeTimerTask(interval int, callback func(int)) *TimerTask {
-	timerTask := &TimerTask{interval, callback, time.Now().UnixMilli()}
-	timerModule.addTask(timerTask)
-	return timerTask
-}
-
-func MakeOneTimeTask(delay int, callback func(int)) *TimerTask {
-	var timerTask *TimerTask
-	wrapper := func(delay int) {
-		callback(delay)
-		timerModule.removeTask(timerTask)
-	}
-	timerTask = &TimerTask{delay, wrapper, time.Now().UnixMilli()}
-	timerModule.addTask(timerTask)
-	return timerTask
-}
-
-func RemoveTimerTask(timerTask *TimerTask) {
-	timerModule.removeTask(timerTask)
-}
-
 type TimerTaskResult struct {
 	timerTask *TimerTask
 	dt        int
@@ -58,6 +37,27 @@ type TimerModule struct {
 	timerLock sync.Mutex
 	timers    map[*TimerTask]struct{}
 	BaseModule
+}
+
+func (timerModule *TimerModule) makeTimerTask(interval int, callback func(int)) *TimerTask {
+	timerTask := &TimerTask{interval, callback, time.Now().UnixMilli()}
+	timerModule.addTask(timerTask)
+	return timerTask
+}
+
+func (timerModule *TimerModule) makeOneTimeTask(delay int, callback func(int)) *TimerTask {
+	var timerTask *TimerTask
+	wrapper := func(delay int) {
+		callback(delay)
+		timerModule.removeTask(timerTask)
+	}
+	timerTask = &TimerTask{delay, wrapper, time.Now().UnixMilli()}
+	timerModule.addTask(timerTask)
+	return timerTask
+}
+
+func (timerModule *TimerModule) removeTimerTask(timerTask *TimerTask) {
+	timerModule.removeTask(timerTask)
 }
 
 func (timerModule *TimerModule) addTask(timerTask *TimerTask) {
@@ -95,18 +95,12 @@ func (timerModule *TimerModule) updateTimerTask(timerTask *TimerTask) {
 	}
 }
 
-func GetTimerLength() int {
+func (timerModule *TimerModule) GetTimerLength() int {
 	timerModule.timerLock.Lock()
 	defer timerModule.timerLock.Unlock()
 	return len(timerModule.timers)
 }
 
-var timerModule *TimerModule
-
-func initTimerModule(events chan IEvent) {
-	timerModule = &TimerModule{timers: make(map[*TimerTask]struct{}), BaseModule: BaseModule{events}}
-}
-
-func startTimerModule() {
-	go timerModule.exec()
+func makeTimerModule(events chan IEvent) *TimerModule {
+	return &TimerModule{timers: make(map[*TimerTask]struct{}), BaseModule: BaseModule{events}}
 }

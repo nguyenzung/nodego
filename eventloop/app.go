@@ -1,6 +1,12 @@
 package eventloop
 
+import "net/http"
+
 type App struct {
+	api    *APICallModule
+	timer  *TimerModule
+	http   *HTTPServerModule
+	ws     *WebsocketModule
 	events chan IEvent
 }
 
@@ -10,29 +16,48 @@ func (app *App) exec() {
 	}
 }
 
-var app *App
-
-func NewApp() {
-	events := make(chan IEvent, 1<<16)
-	initModules(events)
-	app = &App{events}
+func (app *App) MakeCallTask(url string, timeout int, callback func(string), err func(error)) *APICallTask {
+	return app.api.makeCallTask(url, timeout, callback, err)
 }
 
-func RunApp() {
-	startModules()
+func (app *App) MakeTimerTask(interval int, callback func(int)) *TimerTask {
+	return app.timer.makeTimerTask(interval, callback)
+}
+
+func (app *App) MakeOneTimeTask(delay int, callback func(int)) *TimerTask {
+	return app.timer.makeOneTimeTask(delay, callback)
+}
+
+func (app *App) RemoveTimerTask(timerTask *TimerTask) {
+	app.timer.removeTask(timerTask)
+}
+
+func (app *App) MakeAPIHandler(path string, handler func(*HTTPResponseWriter, *http.Request)) {
+	app.http.makeAPIHandler(path, handler)
+}
+
+func (app *App) initModules(events chan IEvent) {
+	app.timer = makeTimerModule(events)
+	app.api = makeAPICallModule(events)
+	app.http = makeHTTPServerModule(events)
+	app.ws = makeWebsocketModule(events)
+}
+
+func (app *App) startModules() {
+	go app.timer.exec()
+	go app.api.exec()
+	go app.http.exec()
+	go app.ws.exec()
+}
+
+func (app *App) RunApp() {
+	app.startModules()
 	app.exec()
 }
 
-func initModules(events chan IEvent) {
-	initTimerModule(events)
-	initAPICallModule(events)
-	initHTTPServerModule(events)
-	initWebsocketModule(events)
-}
-
-func startModules() {
-	startTimerModule()
-	startAPICallModule()
-	startHTTPServerModule()
-	startWebsocketModule()
+func NewApp() *App {
+	events := make(chan IEvent, 1<<16)
+	app := &App{events: events}
+	app.initModules(events)
+	return app
 }

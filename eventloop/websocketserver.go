@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"log"
 	"net/http"
-	"sync"
 
 	"github.com/gorilla/websocket"
 )
@@ -15,80 +14,70 @@ var upgrader = websocket.Upgrader{
 }
 
 type Session struct {
-	path         string
-	conn         *websocket.Conn
-	running      bool
-	runningMutex sync.Mutex
-	handler      func(message string, session *Session)
+	path             string
+	conn             *websocket.Conn
+	messageHandler   func(message MessageEvent, session *Session)
+	closeHandler     func(code int, text string) error
+	replyChannel     chan *ReplyMessage
+	onMessageChannel chan *MessageEvent
 }
 
-func makeSession(path string, conn *websocket.Conn, handler func(string, *Session)) *Session {
-	return &Session{path, conn, true, sync.Mutex{}, handler}
+func makeSession(path string, conn *websocket.Conn, messageHandler func(MessageEvent, *Session), closeHandler func(code int, text string) error) *Session {
+	return &Session{path: path, conn: conn, messageHandler: messageHandler, closeHandler: closeHandler, replyChannel: make(chan *ReplyMessage), onMessageChannel: make(chan *MessageEvent)}
+}
+
+type MessageEvent struct {
+	messageType int
+	data        []byte
+	err         error
+}
+
+func MakeMessageEvent(messageType int, data []byte, err error) *MessageEvent {
+	return &MessageEvent{messageType, data, err}
+}
+
+type ReplyMessage struct {
+	messageType int
+	data        []byte
+}
+
+func MakeReplyMessage(messageType int, data []byte) *ReplyMessage {
+	return &ReplyMessage{messageType, data}
 }
 
 func (session *Session) listen() {
-	for session.isRunning() {
+	for {
 		messageType, p, err := session.conn.ReadMessage()
 		if err != nil {
 			log.Println(err)
-			return
+		} else {
+			fmt.Println("[Message]", "%d %s", messageType, string(p))
+			message := MakeMessageEvent(messageType, p, err)
+			session.onMessageChannel <- message
 		}
-		fmt.Println("[Message]", "%d %s", messageType, string(p))
 	}
-	session.conn.Close()
 }
 
-func (session *Session) isRunning() bool {
-	session.runningMutex.Lock()
-	defer session.runningMutex.Unlock()
-	return session.running
-}
-
-func (session *Session) Close() {
-	session.runningMutex.Lock()
-	session.running = false
-	session.runningMutex.Unlock()
+func (session *Session) response() {
+	for replyMessage := range session.replyChannel {
+		session.conn.WriteMessage(replyMessage.messageType, replyMessage.data)
+	}
 }
 
 func (session *Session) WriteText(data []byte) {
-	session.conn.WriteMessage(websocket.TextMessage, data)
+	replyMessage := MakeReplyMessage(websocket.TextMessage, data)
+	session.replyChannel <- replyMessage
 }
 
 func (session *Session) WriteBytes(data []byte) {
-	session.conn.WriteMessage(websocket.BinaryMessage, data)
+	replyMessage := MakeReplyMessage(websocket.BinaryMessage, data)
+	session.replyChannel <- replyMessage
 }
 
-func MakeWebsocketSession(path string, conn *websocket.Conn) *Session {
-	return &Session{path: path, conn: conn}
-}
-
-func MakeWS(path string, messageHandler func(message string, session *Session)) {
-	websocketModule.server.Handler.(*http.ServeMux).HandleFunc(path, func(w http.ResponseWriter, r *http.Request) {
-		fmt.Println("Request come")
-		upgrader.CheckOrigin = func(r *http.Request) bool { return true }
-		conn, err := upgrader.Upgrade(w, r, nil)
-
-		conn.SetPingHandler(func(appData string) error {
-			return nil
-		})
-
-		conn.SetPongHandler(func(appData string) error {
-			return nil
-		})
-
-		conn.SetCloseHandler(func(code int, text string) error {
-			return nil
-		})
-
-		if err != nil {
-			log.Println(err)
-		} else {
-			session := makeSession(path, conn, messageHandler)
-			session.listen()
-		}
-
-		log.Println("Client Connected")
-	})
+func (session *Session) Close(code int, data []byte) {
+	replyMessage := MakeReplyMessage(websocket.BinaryMessage, data)
+	session.replyChannel <- replyMessage
+	close(session.replyChannel)
 }
 
 type WebsocketModule struct {
@@ -97,17 +86,29 @@ type WebsocketModule struct {
 	sessions map[*Session]struct{}
 }
 
+func (websocket *WebsocketModule) MakeWS(path string, messageHandler func(message MessageEvent, session *Session), closeHandler func(code int, text string) error) {
+	websocket.server.Handler.(*http.ServeMux).HandleFunc(path, func(w http.ResponseWriter, r *http.Request) {
+		fmt.Println("Request come")
+		upgrader.CheckOrigin = func(r *http.Request) bool { return true }
+		conn, err := upgrader.Upgrade(w, r, nil)
+
+		if err != nil {
+			log.Println(err)
+		} else {
+			session := makeSession(path, conn, messageHandler, closeHandler)
+			go session.listen()
+			go session.response()
+		}
+
+		log.Println("Client Connected")
+	})
+}
+
 func (websocket *WebsocketModule) exec() {
 	log.Fatal(websocket.server.ListenAndServe())
 }
 
-var websocketModule *WebsocketModule
-
-func initWebsocketModule(events chan IEvent) {
+func makeWebsocketModule(events chan IEvent) *WebsocketModule {
 	server := makeServer(fmt.Sprintf("%s:%d", WEBSOCKET_IP, WEBSOCKET_PORT))
-	websocketModule = &WebsocketModule{BaseModule: BaseModule{events}, server: server, sessions: make(map[*Session]struct{})}
-}
-
-func startWebsocketModule() {
-	go websocketModule.exec()
+	return &WebsocketModule{BaseModule: BaseModule{events}, server: server, sessions: make(map[*Session]struct{})}
 }
