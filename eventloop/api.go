@@ -81,14 +81,14 @@ func (api *APICallModule) makeWorkerThread() {
 	}
 }
 
-func (api *APICallModule) exec() {
-	api.makeWorkerThread()
-}
-
 func (api *APICallModule) makeCallTask(url string, timeout int, callback func(string), err func(error)) *APICallTask {
 	callTask := &APICallTask{url, timeout, callback, err}
 	api.tasks <- callTask
 	return callTask
+}
+
+func (api *APICallModule) exec() {
+	api.makeWorkerThread()
 }
 
 func makeAPICallModule(events chan IEvent) *APICallModule {

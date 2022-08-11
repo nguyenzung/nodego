@@ -75,17 +75,6 @@ func (timerModule *TimerModule) removeTask(timerTask *TimerTask) {
 	timerModule.timerLock.Unlock()
 }
 
-func (timerModule *TimerModule) exec() {
-	for {
-		timerModule.timerLock.Lock()
-		for timerTask := range timerModule.timers {
-			timerModule.updateTimerTask(timerTask)
-		}
-		timerModule.timerLock.Unlock()
-		time.Sleep(time.Millisecond)
-	}
-}
-
 func (timerModule *TimerModule) updateTimerTask(timerTask *TimerTask) {
 	currentTime := time.Now().UnixMilli()
 	dt := timerTask.check(currentTime)
@@ -99,6 +88,17 @@ func (timerModule *TimerModule) GetTimerLength() int {
 	timerModule.timerLock.Lock()
 	defer timerModule.timerLock.Unlock()
 	return len(timerModule.timers)
+}
+
+func (timerModule *TimerModule) exec() {
+	for {
+		timerModule.timerLock.Lock()
+		for timerTask := range timerModule.timers {
+			timerModule.updateTimerTask(timerTask)
+		}
+		timerModule.timerLock.Unlock()
+		time.Sleep(time.Millisecond)
+	}
 }
 
 func makeTimerModule(events chan IEvent) *TimerModule {
