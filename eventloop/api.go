@@ -46,12 +46,6 @@ func (caller *APICallTask) send() (string, error) {
 	return "", err
 }
 
-func MakeCallTask(url string, timeout int, callback func(string), err func(error)) *APICallTask {
-	callTask := &APICallTask{url, timeout, callback, err}
-	api.tasks <- callTask
-	return callTask
-}
-
 type APICallTaskResult struct {
 	callTask *APICallTask
 	resp     string
@@ -91,12 +85,12 @@ func (api *APICallModule) exec() {
 	api.makeWorkerThread()
 }
 
-var api *APICallModule
-
-func initAPICallModule(events chan IEvent) {
-	api = &APICallModule{BaseModule: BaseModule{events}, numThread: API_NUM_THREAD, tasks: make(chan *APICallTask, API_NUM_THREAD)}
+func (api *APICallModule) makeCallTask(url string, timeout int, callback func(string), err func(error)) *APICallTask {
+	callTask := &APICallTask{url, timeout, callback, err}
+	api.tasks <- callTask
+	return callTask
 }
 
-func startAPICallModule() {
-	go api.exec()
+func makeAPICallModule(events chan IEvent) *APICallModule {
+	return &APICallModule{BaseModule: BaseModule{events}, numThread: API_NUM_THREAD, tasks: make(chan *APICallTask, API_NUM_THREAD)}
 }

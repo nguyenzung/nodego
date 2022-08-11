@@ -42,36 +42,26 @@ func (event *HTTPServeEvent) process() {
 
 type HTTPServerModule struct {
 	BaseModule
-	server    *http.Server
-	locker    *sync.Mutex
-	apiMapper map[string]func(*HTTPResponseWriter, *http.Request)
+	server *http.Server
+	locker *sync.Mutex
 }
 
-func (httpModule *HTTPServerModule) exec() {
-	log.Fatal("[LOG]", httpModule.server.ListenAndServe())
-}
-
-var httpModule *HTTPServerModule
-
-func MakeAPIHandler(path string, handler func(*HTTPResponseWriter, *http.Request)) {
-	httpModule.apiMapper[path] = handler
+func (httpModule *HTTPServerModule) makeAPIHandler(path string, handler func(*HTTPResponseWriter, *http.Request)) {
 	httpModule.server.Handler.(*http.ServeMux).HandleFunc(path, func(rw http.ResponseWriter, r *http.Request) {
-		handler, status := httpModule.apiMapper[path]
-		if status {
-			flagChannel := make(chan struct{})
-			w := &HTTPResponseWriter{rw, flagChannel}
-			serveEvent := HTTPServeEvent{w, r, handler}
-			httpModule.events <- &serveEvent
-			w.wait()
-		}
+		flagChannel := make(chan struct{})
+		w := &HTTPResponseWriter{rw, flagChannel}
+		serveEvent := HTTPServeEvent{w, r, handler}
+		httpModule.events <- &serveEvent
+		w.wait()
 	})
 }
 
-func initHTTPServerModule(events chan IEvent) {
-	server := makeServer(fmt.Sprintf("%s:%d", HTTP_IP, HTTP_PORT))
-	httpModule = &HTTPServerModule{BaseModule{events}, server, &sync.Mutex{}, make(map[string]func(*HTTPResponseWriter, *http.Request))}
+func (httpModule *HTTPServerModule) exec() {
+
+	log.Fatal("[LOG]", httpModule.server.ListenAndServe())
 }
 
-func startHTTPServerModule() {
-	go httpModule.exec()
+func makeHTTPServerModule(events chan IEvent) *HTTPServerModule {
+	server := makeServer(fmt.Sprintf("%s:%d", HTTP_IP, HTTP_PORT))
+	return &HTTPServerModule{BaseModule{events}, server, &sync.Mutex{}}
 }
