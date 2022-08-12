@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"sync"
 	"time"
 
 	"github.com/gorilla/websocket"
@@ -21,6 +22,8 @@ type Session struct {
 	messageHandler func(message *MessageEvent, session *Session)
 	closeHandler   func(closeMessage *CloseEvent, session *Session) error
 	replyChannel   chan *ReplyMessage
+	isClosed       bool
+	closeMutex     sync.Mutex
 }
 
 func (session *Session) init() {
@@ -32,7 +35,7 @@ func (session *Session) init() {
 }
 
 func makeSession(path string, conn *websocket.Conn, wsModule *WebsocketModule, messageHandler func(*MessageEvent, *Session), closeHandler func(*CloseEvent, *Session) error) *Session {
-	return &Session{path: path, conn: conn, wsModule: wsModule, messageHandler: messageHandler, closeHandler: closeHandler, replyChannel: make(chan *ReplyMessage)}
+	return &Session{path: path, conn: conn, wsModule: wsModule, messageHandler: messageHandler, closeHandler: closeHandler, replyChannel: make(chan *ReplyMessage), isClosed: false}
 }
 
 type MessageEvent struct {
@@ -85,36 +88,51 @@ func (session *Session) listen() {
 			session.wsModule.events <- message
 		}
 		if err != nil {
+			fmt.Println(err, "Send close request")
 			session.WriteClose(1000, "")
 			break
 		}
 	}
+	fmt.Println(" ---- End reader --- ")
 }
 
 func (session *Session) response() {
 	for replyMessage := range session.replyChannel {
-		fmt.Println("Send")
 		err := session.conn.WriteMessage(replyMessage.messageType, replyMessage.data)
 		if err != nil {
 			fmt.Println("[WS SEND ERRO]", err)
+		} else {
+			fmt.Println("[WS SENT]")
+		}
+	}
+	fmt.Println(" ---- End writer --- ")
+}
+
+func (session *Session) send(replyMessage *ReplyMessage) {
+	session.closeMutex.Lock()
+	defer session.closeMutex.Unlock()
+	if !session.isClosed {
+		session.replyChannel <- replyMessage
+		if replyMessage.messageType == websocket.CloseMessage {
+			session.isClosed = true
+			close(session.replyChannel)
 		}
 	}
 }
 
 func (session *Session) WriteText(data []byte) {
 	replyMessage := MakeReplyMessage(websocket.TextMessage, data)
-	session.replyChannel <- replyMessage
+	session.send(replyMessage)
 }
 
 func (session *Session) WriteBytes(data []byte) {
 	replyMessage := MakeReplyMessage(websocket.BinaryMessage, data)
-	session.replyChannel <- replyMessage
+	session.send(replyMessage)
 }
 
 func (session *Session) WriteClose(code int, data string) {
 	replyMessage := MakeReplyMessage(websocket.CloseMessage, websocket.FormatCloseMessage(code, data))
-	session.replyChannel <- replyMessage
-	close(session.replyChannel)
+	session.send(replyMessage)
 }
 
 type WebsocketModule struct {
@@ -128,7 +146,7 @@ func (websocket *WebsocketModule) makeWSHandler(path string, messageHandler func
 		fmt.Println("Request come")
 		upgrader.CheckOrigin = func(r *http.Request) bool { return true }
 		conn, err := upgrader.Upgrade(w, r, nil)
-		conn.SetReadDeadline(time.Now().Add(time.Second * 60))
+		conn.SetReadDeadline(time.Now().Add(time.Second * 30))
 		if err != nil {
 			log.Println(err)
 		} else {
