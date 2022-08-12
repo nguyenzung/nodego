@@ -28,7 +28,7 @@ func main() {
 		}
 	})
 	app.MakeWSHandler("/", func(message *ev.MessageEvent, session *ev.Session) {
-		fmt.Println("[Message]", string(message.Data), " ||| [ThreadID]:", threadutils.ThreadID())
+		fmt.Println("[Message]", string(message.Data), message.MessageType, message.Err, " ||| [ThreadID]:", threadutils.ThreadID())
 		if string(message.Data) == "Bye" {
 			session.WriteClose(1000, "")
 		} else {
