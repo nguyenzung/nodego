@@ -40,10 +40,10 @@ func (timerResult *TimerTaskResult) process() {
 2. How to use:
 // In main function
 func main() {
-	eventloop.NewApp()	// Init app with this command
+	app := ev.NewApp()	// Init app with this command
 	// TODO 
 	// ....
 	// ....
 	//
-	eventloop.RunApp()	// Run app with this command
+	app.Exec()	// Run app with this command
 }

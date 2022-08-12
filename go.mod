@@ -1,4 +1,4 @@
-module github.com/nguyenzung/go-event-loop
+module github.com/nguyenzung/nodego
 
 go 1.17
 

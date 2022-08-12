@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"net/http"
 
-	ev "github.com/nguyenzung/go-event-loop/eventloop"
-	"github.com/nguyenzung/go-event-loop/threadutils"
+	ev "github.com/nguyenzung/nodego/eventloop"
+	"github.com/nguyenzung/nodego/threadutils"
 )
 
 func main() {
@@ -39,5 +39,5 @@ func main() {
 		fmt.Println("[WS Connection is closed]", closeMessage.Code, closeMessage.Text)
 		return nil
 	})
-	app.RunApp()
+	app.Exec()
 }

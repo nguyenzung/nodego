@@ -42,11 +42,13 @@ func (event *HTTPServeEvent) process() {
 
 type HTTPServerModule struct {
 	BaseModule
-	server *http.Server
-	locker *sync.Mutex
+	server     *http.Server
+	locker     *sync.Mutex
+	numHandler int
 }
 
 func (httpModule *HTTPServerModule) makeAPIHandler(path string, handler func(*HTTPResponseWriter, *http.Request)) {
+	httpModule.numHandler++
 	httpModule.server.Handler.(*http.ServeMux).HandleFunc(path, func(rw http.ResponseWriter, r *http.Request) {
 		flagChannel := make(chan struct{})
 		w := &HTTPResponseWriter{rw, flagChannel}
@@ -58,11 +60,12 @@ func (httpModule *HTTPServerModule) makeAPIHandler(path string, handler func(*HT
 }
 
 func (httpModule *HTTPServerModule) exec() {
-
-	log.Fatal("[LOG]", httpModule.server.ListenAndServe())
+	if httpModule.numHandler > 0 {
+		log.Fatal("[LOG]", httpModule.server.ListenAndServe())
+	}
 }
 
 func makeHTTPServerModule(events chan IEvent) *HTTPServerModule {
 	server := makeServer(fmt.Sprintf("%s:%d", HTTP_IP, HTTP_PORT))
-	return &HTTPServerModule{BaseModule{events}, server, &sync.Mutex{}}
+	return &HTTPServerModule{BaseModule{events}, server, &sync.Mutex{}, 0}
 }
