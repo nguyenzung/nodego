@@ -20,6 +20,7 @@ type Session struct {
 	wsModule       *WebsocketModule
 	messageHandler func(message *MessageEvent, session *Session)
 	closeHandler   func(closeMessage *CloseEvent, session *Session) error
+	replyChannel   chan *ReplyMessage
 }
 
 func (session *Session) init() {
@@ -31,7 +32,7 @@ func (session *Session) init() {
 }
 
 func makeSession(path string, conn *websocket.Conn, wsModule *WebsocketModule, messageHandler func(*MessageEvent, *Session), closeHandler func(*CloseEvent, *Session) error) *Session {
-	return &Session{path: path, conn: conn, wsModule: wsModule, messageHandler: messageHandler, closeHandler: closeHandler}
+	return &Session{path: path, conn: conn, wsModule: wsModule, messageHandler: messageHandler, closeHandler: closeHandler, replyChannel: make(chan *ReplyMessage)}
 }
 
 type MessageEvent struct {
@@ -76,9 +77,6 @@ func MakeReplyMessage(messageType int, data []byte) *ReplyMessage {
 	return &ReplyMessage{messageType, data}
 }
 
-type IOErrorEvent struct {
-}
-
 func (session *Session) listen() {
 	for {
 		messageType, p, err := session.conn.ReadMessage()
@@ -87,31 +85,36 @@ func (session *Session) listen() {
 			session.wsModule.events <- message
 		}
 		if err != nil {
-			fmt.Println("[WS] Receive data from client failed", err)
+			session.WriteClose(1000, "")
 			break
 		}
 	}
-	fmt.Println("End ws read thread")
 }
 
-func (session *Session) response(replyMessage *ReplyMessage) error {
-	return session.conn.WriteMessage(replyMessage.messageType, replyMessage.data)
-
+func (session *Session) response() {
+	for replyMessage := range session.replyChannel {
+		fmt.Println("Send")
+		err := session.conn.WriteMessage(replyMessage.messageType, replyMessage.data)
+		if err != nil {
+			fmt.Println("[WS SEND ERRO]", err)
+		}
+	}
 }
 
-func (session *Session) WriteText(data []byte) error {
+func (session *Session) WriteText(data []byte) {
 	replyMessage := MakeReplyMessage(websocket.TextMessage, data)
-	return session.response(replyMessage)
+	session.replyChannel <- replyMessage
 }
 
-func (session *Session) WriteBytes(data []byte) error {
+func (session *Session) WriteBytes(data []byte) {
 	replyMessage := MakeReplyMessage(websocket.BinaryMessage, data)
-	return session.response(replyMessage)
+	session.replyChannel <- replyMessage
 }
 
-func (session *Session) Close(code int, data string) error {
+func (session *Session) WriteClose(code int, data string) {
 	replyMessage := MakeReplyMessage(websocket.CloseMessage, websocket.FormatCloseMessage(code, data))
-	return session.response(replyMessage)
+	session.replyChannel <- replyMessage
+	close(session.replyChannel)
 }
 
 type WebsocketModule struct {
@@ -132,6 +135,7 @@ func (websocket *WebsocketModule) makeWSHandler(path string, messageHandler func
 			session := makeSession(path, conn, websocket, messageHandler, closeHandler)
 			session.init()
 			go session.listen()
+			go session.response()
 		}
 		log.Println("Client Connected")
 	})
