@@ -29,7 +29,11 @@ func main() {
 	})
 	app.MakeWSHandler("/", func(message *ev.MessageEvent, session *ev.Session) {
 		fmt.Println("[Message]", string(message.Data), " ||| [ThreadID]:", threadutils.ThreadID())
-		session.WriteText([]byte("Hello from mainthread in server"))
+		if string(message.Data) == "Bye" {
+			session.WriteClose(1000, "")
+		} else {
+			session.WriteText([]byte("Hello from mainthread in server"))
+		}
 
 	}, func(closeMessage *ev.CloseEvent, session *ev.Session) error {
 		fmt.Println("[WS Connection is closed]", closeMessage.Code, closeMessage.Text)
