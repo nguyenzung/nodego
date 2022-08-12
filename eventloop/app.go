@@ -9,6 +9,7 @@ type App struct {
 	timer  *TimerModule
 	http   *HTTPServerModule
 	ws     *WebsocketModule
+	
 	events chan IEvent
 }
 
