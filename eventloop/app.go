@@ -5,11 +5,11 @@ import (
 )
 
 type App struct {
-	api    *APICallModule
-	timer  *TimerModule
-	http   *HTTPServerModule
-	ws     *WebsocketModule
-	
+	api   *APICallModule
+	timer *TimerModule
+	http  *HTTPServerModule
+	ws    *WebsocketModule
+
 	events chan IEvent
 }
 
@@ -57,7 +57,7 @@ func (app *App) startModules() {
 	go app.ws.exec()
 }
 
-func (app *App) RunApp() {
+func (app *App) Exec() {
 	app.startModules()
 	app.exec()
 }

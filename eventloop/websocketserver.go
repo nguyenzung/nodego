@@ -132,13 +132,13 @@ func (session *Session) WriteClose(code int, data string) {
 
 type WebsocketModule struct {
 	BaseModule
-	server   *http.Server
-	sessions map[*Session]struct{}
+	server     *http.Server
+	numHandler int
 }
 
 func (websocket *WebsocketModule) makeWSHandler(path string, messageHandler func(*MessageEvent, *Session), closeHandler func(*CloseEvent, *Session) error) {
+	websocket.numHandler++
 	websocket.server.Handler.(*http.ServeMux).HandleFunc(path, func(w http.ResponseWriter, r *http.Request) {
-		fmt.Println("Request come")
 		upgrader.CheckOrigin = func(r *http.Request) bool { return true }
 		conn, err := upgrader.Upgrade(w, r, nil)
 		conn.SetReadDeadline(time.Now().Add(time.Second * WS_TIMEOUT_IN_SECONDS))
@@ -150,15 +150,17 @@ func (websocket *WebsocketModule) makeWSHandler(path string, messageHandler func
 			go session.listen()
 			go session.response()
 		}
-		log.Println("Client Connected")
+		log.Println("[WS] Client Connected")
 	})
 }
 
 func (websocket *WebsocketModule) exec() {
-	log.Fatal(websocket.server.ListenAndServe())
+	if websocket.numHandler > 0 {
+		log.Fatal(websocket.server.ListenAndServe())
+	}
 }
 
 func makeWebsocketModule(events chan IEvent) *WebsocketModule {
 	server := makeServer(fmt.Sprintf("%s:%d", WEBSOCKET_IP, WEBSOCKET_PORT))
-	return &WebsocketModule{BaseModule: BaseModule{events}, server: server, sessions: make(map[*Session]struct{})}
+	return &WebsocketModule{BaseModule: BaseModule{events}, server: server}
 }
