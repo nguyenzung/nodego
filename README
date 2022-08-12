@@ -1,0 +1,49 @@
+1. Design:
+- App: Run on mainthread, handle callback function. We have a loop run forever to process pushed events 
+- Modules: TimerModule, API, HTTPServerModule... Each module runs on different threads. We can have more than one thread per module
+- When developer create a task, the task is added to a corresponding module. When the module finish the task, the module will push an event to app. 
+
+// App
+type App struct {
+	events chan IResult // events chanel, used to receive events from modules
+}
+
+// Timer Module
+type TimerModule struct {
+	timers map[*TimerTask]struct{}
+	events chan IResult	// events chanel, used to push events to app
+}
+
+// Task to be processed by TimerModule
+type TimerTask struct {
+	interval   int
+	callback   func(int)
+	latestTime int64
+}
+
+// When have timeout event, TimerModule push this result to App by using 'events chan IResult'
+type TimerTaskResult struct {
+	timerTask *TimerTask
+	dt        int
+}
+
+type IResult interface {
+	process()
+}
+
+// TimerTaskResult need to implement process() from IResult interface
+func (timerResult *TimerTaskResult) process() {
+	timerResult.timerTask.callback(timerResult.dt)
+}
+
+
+2. How to use:
+// In main function
+func main() {
+	eventloop.NewApp()	// Init app with this command
+	// TODO 
+	// ....
+	// ....
+	//
+	eventloop.RunApp()	// Run app with this command
+}
