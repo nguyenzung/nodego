@@ -11,8 +11,8 @@ import (
 )
 
 var upgrader = websocket.Upgrader{
-	ReadBufferSize:  1024,
-	WriteBufferSize: 1024,
+	ReadBufferSize:  WS_READ_BUFFER_SIZE,
+	WriteBufferSize: WS_WRITE_BUFFER_SIZE,
 }
 
 type Session struct {
@@ -84,16 +84,14 @@ func (session *Session) listen() {
 	for {
 		messageType, p, err := session.conn.ReadMessage()
 		message := makeMessageEvent(session, messageType, p, err)
-		if messageType == websocket.TextMessage || messageType == websocket.BinaryMessage {
-			session.wsModule.events <- message
-		}
+		session.wsModule.events <- message
 		if err != nil {
 			fmt.Println(err, "Send close request")
 			session.WriteClose(1000, "")
 			break
 		}
 	}
-	fmt.Println(" ---- End reader --- ")
+	// fmt.Println(" ---- End reader --- ")
 }
 
 func (session *Session) response() {
@@ -101,11 +99,9 @@ func (session *Session) response() {
 		err := session.conn.WriteMessage(replyMessage.messageType, replyMessage.data)
 		if err != nil {
 			fmt.Println("[WS SEND ERRO]", err)
-		} else {
-			fmt.Println("[WS SENT]")
 		}
 	}
-	fmt.Println(" ---- End writer --- ")
+	// fmt.Println(" ---- End writer --- ")
 }
 
 func (session *Session) send(replyMessage *ReplyMessage) {
@@ -117,6 +113,8 @@ func (session *Session) send(replyMessage *ReplyMessage) {
 			session.isClosed = true
 			close(session.replyChannel)
 		}
+	} else {
+		fmt.Println("[WS ]Writing channel was closed")
 	}
 }
 
@@ -146,7 +144,7 @@ func (websocket *WebsocketModule) makeWSHandler(path string, messageHandler func
 		fmt.Println("Request come")
 		upgrader.CheckOrigin = func(r *http.Request) bool { return true }
 		conn, err := upgrader.Upgrade(w, r, nil)
-		conn.SetReadDeadline(time.Now().Add(time.Second * 30))
+		conn.SetReadDeadline(time.Now().Add(time.Second * WS_TIMEOUT_IN_SECONDS))
 		if err != nil {
 			log.Println(err)
 		} else {
