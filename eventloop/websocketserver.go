@@ -86,12 +86,10 @@ func (session *Session) listen() {
 		message := makeMessageEvent(session, messageType, p, err)
 		session.wsModule.events <- message
 		if err != nil {
-			fmt.Println(err, "Send close request")
 			session.WriteClose(1000, "")
 			break
 		}
 	}
-	// fmt.Println(" ---- End reader --- ")
 }
 
 func (session *Session) response() {
@@ -101,7 +99,6 @@ func (session *Session) response() {
 			fmt.Println("[WS SEND ERRO]", err)
 		}
 	}
-	// fmt.Println(" ---- End writer --- ")
 }
 
 func (session *Session) send(replyMessage *ReplyMessage) {
