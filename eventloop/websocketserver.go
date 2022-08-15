@@ -27,6 +27,8 @@ type Session struct {
 }
 
 func (session *Session) init() {
+	go session.listen()
+	go session.response()
 	session.conn.SetCloseHandler(func(code int, text string) error {
 		closeMessage := makeCloseEvent(session, code, text)
 		session.wsModule.events <- closeMessage
@@ -147,8 +149,6 @@ func (websocket *WebsocketModule) makeWSHandler(path string, messageHandler func
 		} else {
 			session := makeSession(path, conn, websocket, messageHandler, closeHandler)
 			session.init()
-			go session.listen()
-			go session.response()
 		}
 		log.Println("[WS] Client Connected")
 	})
