@@ -23,6 +23,8 @@ func sum(arr ...int) (int, error) {
 func main() {
 	app := ev.NewApp()
 
+	app.MakeCallTask("http://localhost:8080", 9, func(s string) { fmt.Println(s) }, func(err error) { fmt.Println(err) })
+
 	task := app.MakeTask(sum,
 		func(result int) {
 			fmt.Println("Sum =", result, " ||| ThreadID", runtimeutils.ThreadID())
