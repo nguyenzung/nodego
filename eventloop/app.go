@@ -9,6 +9,7 @@ type App struct {
 	timer *TimerModule
 	http  *HTTPServerModule
 	ws    *WebsocketModule
+	tasks *TaskModule
 
 	events chan IEvent
 }
@@ -43,11 +44,16 @@ func (app *App) MakeWSHandler(path string, messageHandler func(*MessageEvent, *S
 	app.ws.makeWSHandler(path, messageHandler, closeHandler)
 }
 
+func (app *App) MakeTask(handler interface{}, callback interface{}, err interface{}) *CustomizedTask {
+	return app.tasks.makeTask(handler, callback, err)
+}
+
 func (app *App) initModules(events chan IEvent) {
 	app.timer = makeTimerModule(events)
 	app.api = makeAPICallModule(events)
 	app.http = makeHTTPServerModule(events)
 	app.ws = makeWebsocketModule(events)
+	app.tasks = makeTaskModule(events)
 }
 
 func (app *App) startModules() {
@@ -55,6 +61,7 @@ func (app *App) startModules() {
 	go app.api.exec()
 	go app.http.exec()
 	go app.ws.exec()
+	go app.tasks.exec()
 }
 
 func (app *App) Exec() {

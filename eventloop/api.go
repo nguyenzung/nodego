@@ -1,7 +1,7 @@
 package eventloop
 
 import (
-	"io/ioutil"
+	"io"
 	"net/http"
 	"time"
 )
@@ -36,7 +36,7 @@ func (caller *APICallTask) send() (string, error) {
 	}
 	resp, err := client.Get(caller.url)
 	if err == nil {
-		body, err := ioutil.ReadAll(resp.Body)
+		body, err := io.ReadAll(resp.Body)
 		if err == nil {
 			return string(body), err
 		} else {
