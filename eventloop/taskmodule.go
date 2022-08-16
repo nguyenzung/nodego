@@ -2,7 +2,6 @@ package eventloop
 
 import (
 	"errors"
-	"fmt"
 	"reflect"
 )
 
@@ -13,7 +12,6 @@ type TaskProcessThread struct {
 func (taskThread *TaskProcessThread) exec() {
 	for {
 		task := <-taskThread.taskModule.taskChannel
-		fmt.Println(task)
 		resp, err := task.handlerExec()
 		callResult := makeTaskResult(task, resp, err)
 		taskThread.taskModule.pushCallResult(callResult)
