@@ -3,6 +3,7 @@ package main
 import (
 	"errors"
 	"fmt"
+	"net/http"
 
 	ev "github.com/nguyenzung/nodego/eventloop"
 	"github.com/nguyenzung/nodego/runtimeutils"
@@ -22,6 +23,10 @@ func sum(arr ...int) (int, error) {
 
 func main() {
 	app := ev.NewApp()
+
+	app.MakeAPIHandler("/test", func(hw *ev.HTTPResponseWriter, r *http.Request) {
+		hw.SendText("123456")
+	})
 
 	app.MakeCallTask("http://localhost:8080", 12, func(s string) { fmt.Println(s) }, func(err error) { fmt.Println(err) })
 
