@@ -2,30 +2,25 @@ package eventloop
 
 import (
 	"fmt"
-	"log"
 	"net/http"
 	"sync"
 )
 
 type HTTPResponseWriter struct {
 	http.ResponseWriter
-	flagChannel chan struct{}
+	responseChannel chan []byte
 }
 
-func (response *HTTPResponseWriter) Send(data string) {
-	response.ResponseWriter.Write([]byte(data))
-	response.ResponseWriter = nil
-	response.flagChannel <- struct{}{}
+func (response *HTTPResponseWriter) SendText(data string) {
+	response.WriteByteArray([]byte(data))
 }
 
-func (response *HTTPResponseWriter) Write(data []byte) {
-	response.ResponseWriter.Write(data)
-	response.ResponseWriter = nil
-	response.flagChannel <- struct{}{}
+func (response *HTTPResponseWriter) WriteByteArray(data []byte) {
+	response.responseChannel <- data
 }
 
 func (response *HTTPResponseWriter) wait() {
-	<-response.flagChannel
+	response.ResponseWriter.Write(<-response.responseChannel)
 }
 
 type HTTPServeEvent struct {
@@ -50,18 +45,19 @@ type HTTPServerModule struct {
 func (httpModule *HTTPServerModule) makeAPIHandler(path string, handler func(*HTTPResponseWriter, *http.Request)) {
 	httpModule.numHandler++
 	httpModule.server.Handler.(*http.ServeMux).HandleFunc(path, func(rw http.ResponseWriter, r *http.Request) {
-		flagChannel := make(chan struct{})
-		w := &HTTPResponseWriter{rw, flagChannel}
+		responseChannel := make(chan []byte)
+		w := &HTTPResponseWriter{rw, responseChannel}
 		serveEvent := HTTPServeEvent{w, r, handler}
 		httpModule.events <- &serveEvent
 		w.wait()
-		close(flagChannel)
+		close(responseChannel)
 	})
 }
 
 func (httpModule *HTTPServerModule) exec() {
 	if httpModule.numHandler > 0 {
-		log.Fatal("[LOG]", httpModule.server.ListenAndServe())
+		fmt.Println("Start a http server at port", HTTP_PORT)
+		httpModule.server.ListenAndServe()
 	}
 }
 
