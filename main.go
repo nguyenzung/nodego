@@ -26,11 +26,10 @@ func main() {
 	app := ev.NewApp()
 
 	app.MakeAPIHandler("/test", func(hw *ev.HTTPResponseWriter, r *http.Request) {
-		hw.SendText("123456")
-	})
-
-	app.MakeOneTimeTask(6000, func(i int) {
-		fmt.Println(" Callback ")
+		// Wait 2 seconds before response data to client
+		app.MakeOneTimeTask(2000, func(i int) {
+			hw.SendText("123456")
+		})
 	})
 
 	task := app.MakeTask(sum,

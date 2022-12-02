@@ -2,7 +2,6 @@ package eventloop
 
 import (
 	"fmt"
-	"log"
 	"net/http"
 	"sync"
 )
@@ -57,7 +56,8 @@ func (httpModule *HTTPServerModule) makeAPIHandler(path string, handler func(*HT
 
 func (httpModule *HTTPServerModule) exec() {
 	if httpModule.numHandler > 0 {
-		log.Fatal("[LOG]", httpModule.server.ListenAndServe())
+		fmt.Println("Start a http server at port", HTTP_PORT)
+		httpModule.server.ListenAndServe()
 	}
 }
 
