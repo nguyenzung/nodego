@@ -32,6 +32,10 @@ func main() {
 		})
 	})
 
+	app.MakeOneTimeTask(1000, func(i int) {
+		app.MakeCallTask("http://localhost:9090/test", 12, func(s string) { fmt.Println("Response from server", s) }, func(err error) { fmt.Println(err) })
+	})
+
 	task := app.MakeTask(sum,
 		func(result int) {
 			fmt.Println("Sum =", result, " ||| ThreadID", runtimeutils.ThreadID())
