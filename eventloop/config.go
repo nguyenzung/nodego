@@ -11,5 +11,5 @@ var (
 	WEBSOCKET_PORT                      = 9091
 	WS_READ_BUFFER_SIZE                 = 1024
 	WS_WRITE_BUFFER_SIZE                = 1024
-	WS_TIMEOUT_IN_SECONDS time.Duration = 300
+	WS_TIMEOUT_IN_SECONDS time.Duration = 3000
 )
