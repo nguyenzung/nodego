@@ -3,8 +3,8 @@ package eventloop
 import "time"
 
 var (
-	API_NUM_THREAD                      = 32
-	TASK_NUM_THREAD                     = 32
+	API_NUM_THREAD                      = 128
+	TASK_NUM_THREAD                     = 128
 	HTTP_IP                             = "0.0.0.0"
 	HTTP_PORT                           = 9090
 	WEBSOCKET_IP                        = "0.0.0.0"
