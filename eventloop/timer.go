@@ -9,6 +9,7 @@ type TimerTask struct {
 	interval   int
 	callback   func(int)
 	latestTime int64
+	isOneTime  bool
 }
 
 func (timerTask *TimerTask) check(currentTime int64) int {
@@ -40,18 +41,13 @@ type TimerModule struct {
 }
 
 func (timerModule *TimerModule) makeTimerTask(interval int, callback func(int)) *TimerTask {
-	timerTask := &TimerTask{interval, callback, time.Now().UnixMilli()}
+	timerTask := &TimerTask{interval, callback, time.Now().UnixMilli(), false}
 	timerModule.addTask(timerTask)
 	return timerTask
 }
 
-func (timerModule *TimerModule) makeOneTimeTask(delay int, callback func(int)) *TimerTask {
-	var timerTask *TimerTask
-	wrapper := func(delay int) {
-		callback(delay)
-		timerModule.removeTask(timerTask)
-	}
-	timerTask = &TimerTask{delay, wrapper, time.Now().UnixMilli()}
+func (timerModule *TimerModule) makeOneTimeTask(interval int, callback func(int)) *TimerTask {
+	timerTask := &TimerTask{interval, callback, time.Now().UnixMilli(), true}
 	timerModule.addTask(timerTask)
 	return timerTask
 }
@@ -81,6 +77,9 @@ func (timerModule *TimerModule) updateTimerTask(timerTask *TimerTask) {
 	if dt > 0 {
 		timerResult := makeTimerResult(timerTask, dt)
 		timerModule.events <- timerResult
+		if timerTask.isOneTime {
+			timerModule.removeTimerTask(timerTask)
+		}
 	}
 }
 
