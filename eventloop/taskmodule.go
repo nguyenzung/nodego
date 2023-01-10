@@ -42,7 +42,7 @@ func (task *CustomizedTask) handlerExec() (interface{}, interface{}) {
 func (task *CustomizedTask) Exec(a ...interface{}) error {
 	if len(task.data) == 0 {
 		task.data = a
-		task.taskModule.addTask(task)
+		go task.taskModule.addTask(task)
 		return nil
 	} else {
 		return errors.New("[ERROR] have executed")
