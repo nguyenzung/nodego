@@ -40,8 +40,8 @@ func (app *App) MakeAPIHandler(path string, handler func(*HTTPResponseWriter, *h
 	app.http.makeAPIHandler(path, handler)
 }
 
-func (app *App) MakeWSHandler(path string, messageHandler func(*MessageEvent, *Session), closeHandler func(*CloseEvent, *Session) error) {
-	app.ws.makeWSHandler(path, messageHandler, closeHandler)
+func (app *App) MakeWSHandler(path string, openHandler func(*Session), messageHandler func(*MessageEvent, *Session), closeHandler func(*CloseEvent, *Session) error) {
+	app.ws.makeWSHandler(path, openHandler, messageHandler, closeHandler)
 }
 
 func (app *App) MakeTask(handler interface{}, callback interface{}, err interface{}) *CustomizedTask {

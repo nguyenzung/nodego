@@ -20,6 +20,7 @@ type Session struct {
 	conn           *websocket.Conn
 	wsModule       *WebsocketModule
 	messageHandler func(message *MessageEvent, session *Session)
+	openHandler    func(session *Session)
 	closeHandler   func(closeMessage *CloseEvent, session *Session) error
 	replyChannel   chan *ReplyMessage
 	isClosed       bool
@@ -36,8 +37,22 @@ func (session *Session) init() {
 	})
 }
 
-func makeSession(path string, conn *websocket.Conn, wsModule *WebsocketModule, messageHandler func(*MessageEvent, *Session), closeHandler func(*CloseEvent, *Session) error) *Session {
-	return &Session{path: path, conn: conn, wsModule: wsModule, messageHandler: messageHandler, closeHandler: closeHandler, replyChannel: make(chan *ReplyMessage), isClosed: false}
+func makeSession(path string, conn *websocket.Conn, wsModule *WebsocketModule, openHandler func(*Session), messageHandler func(*MessageEvent, *Session), closeHandler func(*CloseEvent, *Session) error) *Session {
+	return &Session{path: path, conn: conn, wsModule: wsModule, openHandler: openHandler, messageHandler: messageHandler, closeHandler: closeHandler, replyChannel: make(chan *ReplyMessage), isClosed: false}
+}
+
+type OpenEvent struct {
+	session *Session
+}
+
+func (openEvent *OpenEvent) process() {
+	if openEvent.session != nil && openEvent.session.openHandler != nil {
+		openEvent.session.openHandler(openEvent.session)
+	}
+}
+
+func makeOpenEvent(session *Session) *OpenEvent {
+	return &OpenEvent{session}
 }
 
 type MessageEvent struct {
@@ -138,7 +153,7 @@ type WebsocketModule struct {
 	numHandler int
 }
 
-func (websocket *WebsocketModule) makeWSHandler(path string, messageHandler func(*MessageEvent, *Session), closeHandler func(*CloseEvent, *Session) error) {
+func (websocket *WebsocketModule) makeWSHandler(path string, openHandler func(*Session), messageHandler func(*MessageEvent, *Session), closeHandler func(*CloseEvent, *Session) error) {
 	websocket.numHandler++
 	websocket.server.Handler.(*http.ServeMux).HandleFunc(path, func(w http.ResponseWriter, r *http.Request) {
 		upgrader.CheckOrigin = func(r *http.Request) bool { return true }
@@ -147,7 +162,9 @@ func (websocket *WebsocketModule) makeWSHandler(path string, messageHandler func
 		if err != nil {
 			log.Println(err)
 		} else {
-			session := makeSession(path, conn, websocket, messageHandler, closeHandler)
+			session := makeSession(path, conn, websocket, openHandler, messageHandler, closeHandler)
+			openEvent := makeOpenEvent(session)
+			session.wsModule.events <- openEvent
 			session.init()
 		}
 		log.Println("[WS] Client Connected")
