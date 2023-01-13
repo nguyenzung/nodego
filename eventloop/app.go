@@ -69,9 +69,42 @@ func (app *App) Exec() {
 	app.exec()
 }
 
+var app *App = nil
+
+func MakeCallTask(url string, timeout int, callback func(string), err func(error)) *APICallTask {
+	return app.api.makeCallTask(url, timeout, callback, err)
+}
+
+func MakeTimerTask(interval int, callback func(int)) *TimerTask {
+	return app.timer.makeTimerTask(interval, callback)
+}
+
+func MakeOneTimeTask(delay int, callback func(int)) *TimerTask {
+	return app.timer.makeOneTimeTask(delay, callback)
+}
+
+func RemoveTimerTask(timerTask *TimerTask) {
+	app.timer.removeTimerTask(timerTask)
+}
+
+func MakeAPIHandler(path string, handler func(*HTTPResponseWriter, *http.Request)) {
+	app.http.makeAPIHandler(path, handler)
+}
+
+func MakeWSHandler(path string, openHandler func(*Session), messageHandler func(*MessageEvent, *Session), closeHandler func(*CloseEvent, *Session) error) {
+	app.ws.makeWSHandler(path, openHandler, messageHandler, closeHandler)
+}
+
+func MakeTask(handler interface{}, callback interface{}, err interface{}) *CustomizedTask {
+	return app.tasks.makeTask(handler, callback, err)
+}
+
 func NewApp() *App {
-	events := make(chan IEvent, 1<<16)
-	app := &App{events: events}
-	app.initModules(events)
-	return app
+	if app == nil {
+		events := make(chan IEvent, 1<<16)
+		app = &App{events: events}
+		app.initModules(events)
+		return app
+	}
+	return nil
 }
