@@ -108,3 +108,16 @@ func NewApp() *App {
 	}
 	return nil
 }
+
+func InitApp() {
+	if app == nil {
+		events := make(chan IEvent, 1<<16)
+		app = &App{events: events}
+		app.initModules(events)
+	}
+}
+
+func ExecApp() {
+	app.startModules()
+	app.exec()
+}
