@@ -56,6 +56,13 @@ func (timerModule *TimerModule) removeTimerTask(timerTask *TimerTask) {
 	timerModule.removeTask(timerTask)
 }
 
+func (timerModule *TimerModule) removeTimerTaskWithoutLock(timerTask *TimerTask) {
+	_, ok := timerModule.timers[timerTask]
+	if ok {
+		delete(timerModule.timers, timerTask)
+	}
+}
+
 func (timerModule *TimerModule) addTask(timerTask *TimerTask) {
 	timerModule.timerLock.Lock()
 	timerModule.timers[timerTask] = struct{}{}
@@ -78,7 +85,7 @@ func (timerModule *TimerModule) updateTimerTask(timerTask *TimerTask) {
 		timerResult := makeTimerResult(timerTask, dt)
 		timerModule.events <- timerResult
 		if timerTask.isOneTime {
-			timerModule.removeTimerTask(timerTask)
+			timerModule.removeTimerTaskWithoutLock(timerTask)
 		}
 	}
 }
