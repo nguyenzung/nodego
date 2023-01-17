@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"log"
 	"net/http"
-	"sync"
 	"time"
 
 	"github.com/gorilla/websocket"
@@ -24,7 +23,6 @@ type Session struct {
 	closeHandler   func(closeMessage *CloseEvent, session *Session) error
 	replyChannel   chan *ReplyMessage
 	isClosed       bool
-	closeMutex     sync.Mutex
 }
 
 func (session *Session) init() {
@@ -98,15 +96,44 @@ func MakeReplyMessage(messageType int, data []byte) *ReplyMessage {
 }
 
 func (session *Session) listen() {
-	for {
+	for !session.isClosed {
 		messageType, p, err := session.conn.ReadMessage()
-		message := makeMessageEvent(session, messageType, p, err)
-		session.wsModule.events <- message
-		if err != nil {
-			session.WriteClose(1000, "")
-			break
+		log.Println(" ----->", messageType, p, err)
+		switch messageType {
+		case websocket.TextMessage:
+			if err == nil {
+				message := makeMessageEvent(session, messageType, p, err)
+				session.wsModule.events <- message
+			}
+
+		case websocket.BinaryMessage:
+			{
+
+			}
+
+		case websocket.PingMessage:
+			{
+
+			}
+
+		case websocket.PongMessage:
+			{
+
+			}
+
+		case websocket.CloseMessage:
+			{
+
+				session.handleCloseRequest()
+			}
+
+		default:
+			{
+				session.onTerminateSession()
+			}
 		}
 	}
+	log.Println("Read is closed")
 }
 
 func (session *Session) response() {
@@ -116,30 +143,48 @@ func (session *Session) response() {
 			fmt.Println("[WS SEND ERRO]", err)
 		}
 	}
+	log.Println("Write is closed")
 }
 
 func (session *Session) send(replyMessage *ReplyMessage) {
-	session.closeMutex.Lock()
-	defer session.closeMutex.Unlock()
 	if !session.isClosed {
 		session.replyChannel <- replyMessage
-		if replyMessage.messageType == websocket.CloseMessage {
-			session.isClosed = true
-			close(session.replyChannel)
-		}
 	} else {
-		fmt.Println("[WS ]Writing channel was closed")
+		log.Println("[WS ]Writing channel was closed")
 	}
+}
+
+func (session *Session) CloseSession(code int, data string) {
+	session.WriteClose(code, data)
+}
+
+func (session *Session) handleCloseRequest() {
+	log.Println("Handle Close request")
+	session.onCloseSession()
+}
+
+func (session *Session) onCloseSession() {
+	log.Println("on Close")
+	session.isClosed = true
+	close(session.replyChannel)
+	// session.conn.Close()
+}
+
+func (session *Session) onTerminateSession() {
+	log.Println("on Terminate")
+	session.isClosed = true
+	close(session.replyChannel)
+	// session.conn.Close()
 }
 
 func (session *Session) WriteText(data []byte) {
 	replyMessage := MakeReplyMessage(websocket.TextMessage, data)
-	session.send(replyMessage)
+	go session.send(replyMessage)
 }
 
 func (session *Session) WriteBytes(data []byte) {
 	replyMessage := MakeReplyMessage(websocket.BinaryMessage, data)
-	session.send(replyMessage)
+	go session.send(replyMessage)
 }
 
 func (session *Session) WriteClose(code int, data string) {
@@ -158,7 +203,7 @@ func (websocket *WebsocketModule) makeWSHandler(path string, openHandler func(*S
 	websocket.server.Handler.(*http.ServeMux).HandleFunc(path, func(w http.ResponseWriter, r *http.Request) {
 		upgrader.CheckOrigin = func(r *http.Request) bool { return true }
 		conn, err := upgrader.Upgrade(w, r, nil)
-		conn.SetReadDeadline(time.Now().Add(time.Second * WS_TIMEOUT_IN_SECONDS))
+		conn.SetReadDeadline(time.Now().Add(time.Second * 20))
 		if err != nil {
 			log.Println(err)
 		} else {
@@ -167,7 +212,6 @@ func (websocket *WebsocketModule) makeWSHandler(path string, openHandler func(*S
 			session.wsModule.events <- openEvent
 			session.init()
 		}
-		log.Println("[WS] Client Connected")
 	})
 }
 
