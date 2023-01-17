@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"sync"
 	"time"
 
 	"github.com/gorilla/websocket"
@@ -15,28 +16,29 @@ var upgrader = websocket.Upgrader{
 }
 
 type Session struct {
-	path           string
-	conn           *websocket.Conn
-	wsModule       *WebsocketModule
-	messageHandler func(message *MessageEvent, session *Session)
-	openHandler    func(session *Session)
-	closeHandler   func(closeMessage *CloseEvent, session *Session) error
-	replyChannel   chan *ReplyMessage
-	isClosed       bool
+	path                string
+	conn                *websocket.Conn
+	wsModule            *WebsocketModule
+	messageHandler      func(message *MessageEvent, session *Session)
+	openHandler         func(session *Session)
+	closeHandler        func(closeMessage *CloseEvent, session *Session) error
+	replyChannel        chan *ReplyMessage
+	isSentClosedEvent   bool
+	isClosed            bool
+	lockSendClosedEvent *sync.Mutex
 }
 
 func (session *Session) init() {
 	go session.listen()
 	go session.response()
 	session.conn.SetCloseHandler(func(code int, text string) error {
-		closeMessage := makeCloseEvent(session, code, text)
-		session.wsModule.events <- closeMessage
+		session.onHandleCloseEvent(code, text)
 		return nil
 	})
 }
 
 func makeSession(path string, conn *websocket.Conn, wsModule *WebsocketModule, openHandler func(*Session), messageHandler func(*MessageEvent, *Session), closeHandler func(*CloseEvent, *Session) error) *Session {
-	return &Session{path: path, conn: conn, wsModule: wsModule, openHandler: openHandler, messageHandler: messageHandler, closeHandler: closeHandler, replyChannel: make(chan *ReplyMessage), isClosed: false}
+	return &Session{path: path, conn: conn, wsModule: wsModule, openHandler: openHandler, messageHandler: messageHandler, closeHandler: closeHandler, replyChannel: make(chan *ReplyMessage), isSentClosedEvent: false, isClosed: false, lockSendClosedEvent: &sync.Mutex{}}
 }
 
 type OpenEvent struct {
@@ -98,7 +100,6 @@ func MakeReplyMessage(messageType int, data []byte) *ReplyMessage {
 func (session *Session) listen() {
 	for !session.isClosed {
 		messageType, p, err := session.conn.ReadMessage()
-		log.Println(" ----->", messageType, p, err)
 		switch messageType {
 		case websocket.TextMessage:
 			if err == nil {
@@ -133,7 +134,7 @@ func (session *Session) listen() {
 			}
 		}
 	}
-	log.Println("Read is closed")
+	// log.Println("Read is closed")
 }
 
 func (session *Session) response() {
@@ -143,7 +144,7 @@ func (session *Session) response() {
 			fmt.Println("[WS SEND ERRO]", err)
 		}
 	}
-	log.Println("Write is closed")
+	// log.Println("Write is closed")
 }
 
 func (session *Session) send(replyMessage *ReplyMessage) {
@@ -158,23 +159,31 @@ func (session *Session) CloseSession(code int, data string) {
 	session.WriteClose(code, data)
 }
 
+func (session *Session) onHandleCloseEvent(code int, data string) {
+	session.lockSendClosedEvent.Lock()
+	defer session.lockSendClosedEvent.Unlock()
+	if !session.isSentClosedEvent {
+		session.isSentClosedEvent = true
+		closeMessage := makeCloseEvent(session, code, data)
+		session.wsModule.events <- closeMessage
+	}
+
+}
+
 func (session *Session) handleCloseRequest() {
-	log.Println("Handle Close request")
 	session.onCloseSession()
 }
 
 func (session *Session) onCloseSession() {
-	log.Println("on Close")
 	session.isClosed = true
 	close(session.replyChannel)
-	// session.conn.Close()
+	session.onHandleCloseEvent(1000, "")
 }
 
 func (session *Session) onTerminateSession() {
-	log.Println("on Terminate")
 	session.isClosed = true
 	close(session.replyChannel)
-	// session.conn.Close()
+	session.onHandleCloseEvent(1002, "")
 }
 
 func (session *Session) WriteText(data []byte) {
